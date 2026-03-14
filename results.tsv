@@ -66,3 +66,4 @@ run	val_loss	params_M	status	time_s	improv_%	description
 065	1.5141	6.8	discard	306	26.8	bs=8 lr=2e-3
 066	1.4943	6.8	keep	306	27.8	bs=8 dropout=0.15 NEW BEST!
 067	1.4843	6.8	keep	306	28.2	bs=8 dropout=0.2 NEW BEST!
+068	1.4686	6.8	keep	306	29.0	bs=8 warmup=300 NEW BEST!
