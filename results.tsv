@@ -46,3 +46,4 @@ run	val_loss	params_M	status	description
 045	1.6466	6.8	discard	warmup=300 wd=0.5
 046	1.6486	8.0	discard	6L 320d wd=0.5
 047	1.6540	6.8	discard	8L 256d wd=0.5
+048	1.7488	8.9	discard	SwiGLU wd=0.5
