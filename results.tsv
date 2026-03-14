@@ -49,3 +49,4 @@ run	val_loss	params_M	status	time_s	improv_%	description
 048	1.7488	8.9	discard	306	15.4	SwiGLU wd=0.5
 049	1.5725	6.8	keep	306	24.0	bs=16 wd=0.5 (more steps) NEW BEST!
 050	1.5634	6.8	keep	306	24.4	bs=16 + wd=0.7 (combo) NEW BEST!
+051	1.5004	6.8	keep	306	27.5	bs=8 (4x more steps) NEW BEST!
