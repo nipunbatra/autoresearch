@@ -11,95 +11,157 @@
             background: #0d1117;
             color: #c9d1d9;
             padding: 2rem;
-            max-width: 1100px;
+            max-width: 1200px;
             margin: 0 auto;
         }
         h1 { color: #58a6ff; margin-bottom: 0.3rem; font-size: 1.6rem; }
-        .subtitle { color: #8b949e; margin-bottom: 2rem; font-size: 0.85rem; }
+        .subtitle { color: #8b949e; margin-bottom: 1.5rem; font-size: 0.85rem; }
+        .stats-bar {
+            display: flex; gap: 1.5rem; flex-wrap: wrap;
+            margin-bottom: 1.5rem; padding: 0.8rem 1rem;
+            background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+        }
+        .stat { text-align: center; }
+        .stat-value { font-size: 1.4rem; font-weight: bold; color: #3fb950; }
+        .stat-value.target { color: #f0883e; }
+        .stat-label { font-size: 0.7rem; color: #8b949e; }
+
         .plot-container {
-            margin-bottom: 2rem;
+            margin-bottom: 1.5rem;
             text-align: center;
+            cursor: pointer;
+            position: relative;
         }
         .plot-container img {
             max-width: 100%;
             border: 1px solid #30363d;
             border-radius: 8px;
+            transition: transform 0.2s;
         }
+        .plot-container:hover img { transform: scale(1.01); }
+        .plot-hint {
+            position: absolute; bottom: 8px; right: 12px;
+            background: #0d1117cc; color: #8b949e; padding: 2px 8px;
+            border-radius: 4px; font-size: 0.7rem;
+        }
+
+        /* Fullscreen overlay */
+        .overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #0d1117f0; z-index: 999; cursor: zoom-out;
+            justify-content: center; align-items: center;
+        }
+        .overlay.active { display: flex; }
+        .overlay img {
+            max-width: 95vw; max-height: 95vh; border-radius: 8px;
+            border: 1px solid #30363d;
+        }
+
         h2 { color: #58a6ff; margin: 1.5rem 0 0.8rem; font-size: 1.2rem; }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.8rem;
-        }
+        .table-wrap { max-height: 500px; overflow-y: auto; border-radius: 8px; border: 1px solid #30363d; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
         th {
-            background: #161b22;
-            color: #58a6ff;
-            padding: 0.5rem 0.8rem;
-            text-align: left;
-            border-bottom: 2px solid #30363d;
-            position: sticky;
-            top: 0;
+            background: #161b22; color: #58a6ff; padding: 0.5rem 0.6rem;
+            text-align: left; border-bottom: 2px solid #30363d;
+            position: sticky; top: 0; z-index: 2;
         }
-        td {
-            padding: 0.4rem 0.8rem;
-            border-bottom: 1px solid #21262d;
-        }
+        td { padding: 0.35rem 0.6rem; border-bottom: 1px solid #21262d; }
         tr:hover { background: #161b22; }
-        .keep { color: #51cf66; font-weight: bold; }
-        .discard { color: #ff6b6b; }
+        .keep { color: #3fb950; font-weight: bold; }
+        .discard { color: #f85149; opacity: 0.7; }
         .best-row { background: #1a3a1a !important; }
-        .timestamp {
-            color: #484f58;
-            font-size: 0.75rem;
-            margin-top: 2rem;
-            text-align: center;
+        .improv-pos { color: #3fb950; }
+        .improv-neg { color: #f85149; }
+        .footer {
+            color: #484f58; font-size: 0.75rem; margin-top: 2rem;
+            text-align: center; padding-top: 1rem; border-top: 1px solid #21262d;
         }
         a { color: #58a6ff; }
     </style>
 </head>
 <body>
-    <h1>Autoresearch: NLQ to Python Code</h1>
+    <h1>Autoresearch: NLQ → Python Code</h1>
     <p class="subtitle">
-        Autonomous AI research loop training a tiny GPT model for code generation.
+        Autonomous AI research loop training a tiny GPT for code generation on Apple Silicon.
         <a href="https://github.com/nipunbatra/autoresearch">GitHub</a>
     </p>
 
-    <div class="plot-container">
+    <div class="stats-bar" id="stats-bar">Loading...</div>
+
+    <div class="plot-container" onclick="openFullscreen()">
         <img src="experiments_plot.png" alt="Experiment progress plot" id="plot">
+        <div class="plot-hint">Click to expand</div>
+    </div>
+
+    <div class="overlay" id="overlay" onclick="closeFullscreen()">
+        <img src="experiments_plot.png" id="overlay-img">
     </div>
 
     <h2>Experiment Log</h2>
-    <div id="table-container">Loading results...</div>
+    <div class="table-wrap" id="table-container">Loading results...</div>
 
-    <p class="timestamp" id="timestamp"></p>
+    <div class="footer" id="footer"></div>
 
     <script>
-        fetch('results.tsv')
+        function openFullscreen() {
+            document.getElementById('overlay').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeFullscreen() {
+            document.getElementById('overlay').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeFullscreen(); });
+
+        const bustCache = '?' + Date.now();
+        document.getElementById('plot').src = 'experiments_plot.png' + bustCache;
+        document.getElementById('overlay-img').src = 'experiments_plot.png' + bustCache;
+
+        fetch('results.tsv' + bustCache)
             .then(r => r.text())
             .then(tsv => {
                 const lines = tsv.trim().split('\n');
                 const headers = lines[0].split('\t');
                 const rows = lines.slice(1).map(l => l.split('\t'));
 
-                // Find best val_loss
-                let bestLoss = Infinity;
-                let bestIdx = -1;
+                const baseline = parseFloat(rows[0][1]);
+                let bestLoss = Infinity, bestIdx = -1, keepCount = 0;
                 rows.forEach((r, i) => {
                     const loss = parseFloat(r[1]);
                     if (loss < bestLoss) { bestLoss = loss; bestIdx = i; }
+                    if (r[3] === 'keep') keepCount++;
                 });
+                const bestImprov = ((baseline - bestLoss) / baseline * 100).toFixed(1);
+                const target35 = (baseline * 0.65).toFixed(4);
 
+                // Stats bar
+                document.getElementById('stats-bar').innerHTML = `
+                    <div class="stat"><div class="stat-value">${rows.length}</div><div class="stat-label">experiments</div></div>
+                    <div class="stat"><div class="stat-value">${keepCount}</div><div class="stat-label">kept</div></div>
+                    <div class="stat"><div class="stat-value">${bestLoss.toFixed(4)}</div><div class="stat-label">best val_loss</div></div>
+                    <div class="stat"><div class="stat-value">${bestImprov}%</div><div class="stat-label">improvement</div></div>
+                    <div class="stat"><div class="stat-value target">${target35}</div><div class="stat-label">35% target</div></div>
+                `;
+
+                // Table
                 let html = '<table><thead><tr>';
                 headers.forEach(h => html += `<th>${h}</th>`);
                 html += '</tr></thead><tbody>';
 
-                rows.forEach((row, i) => {
+                // Reverse to show newest first
+                const rRows = [...rows].reverse();
+                const rBestIdx = rows.length - 1 - bestIdx;
+                rRows.forEach((row, i) => {
                     const status = row[3];
-                    const isBest = i === bestIdx;
+                    const isBest = i === rBestIdx;
                     html += `<tr class="${isBest ? 'best-row' : ''}">`;
                     row.forEach((cell, j) => {
                         if (j === 3) {
                             html += `<td class="${status}">${cell}</td>`;
+                        } else if (j === 5) {
+                            const v = parseFloat(cell);
+                            const cls = v > 0 ? 'improv-pos' : v < 0 ? 'improv-neg' : '';
+                            html += `<td class="${cls}">${cell}%</td>`;
                         } else {
                             html += `<td>${cell}</td>`;
                         }
@@ -109,15 +171,12 @@
 
                 html += '</tbody></table>';
                 document.getElementById('table-container').innerHTML = html;
-                document.getElementById('timestamp').textContent =
-                    `${rows.length} experiments | Best: ${bestLoss.toFixed(4)} | Auto-updated on push`;
+                document.getElementById('footer').textContent =
+                    `Auto-updated on every push | Based on Karpathy's autoresearch`;
             })
             .catch(() => {
                 document.getElementById('table-container').textContent = 'Failed to load results.';
             });
-
-        // Cache-bust the plot
-        document.getElementById('plot').src = 'experiments_plot.png?' + Date.now();
     </script>
 </body>
 </html>

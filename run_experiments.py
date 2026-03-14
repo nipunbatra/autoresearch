@@ -14,6 +14,7 @@ import csv
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -21,7 +22,10 @@ RESULTS_TSV = os.path.join(BASE_DIR, "results.tsv")
 PLOT_PATH = os.path.join(BASE_DIR, "experiments_plot.png")
 TRAIN_SCRIPT = os.path.join(BASE_DIR, "train_mlx.py")
 
+BASELINE_LOSS = 2.0686  # experiment 001
+
 # --- Current best config (baseline for all experiments) ---
+# Updated after exp 049: bs=16 was the big win
 BEST_CONFIG = {
     "DEPTH": 5,
     "N_EMBD": 320,
@@ -29,7 +33,7 @@ BEST_CONFIG = {
     "MLP_RATIO": 4,
     "USE_SWIGLU": False,
     "DROPOUT": 0.1,
-    "BATCH_SIZE": 32,
+    "BATCH_SIZE": 16,
     "LEARNING_RATE": 3e-3,
     "WEIGHT_DECAY": 0.5,
     "WARMUP_STEPS": 150,
@@ -42,19 +46,25 @@ BEST_CONFIG = {
 
 # --- Experiments to run ---
 # Each experiment: (description, {overrides})
+# Target: 35% improvement = val_loss < 1.345
 EXPERIMENTS = [
-    ("weight_decay=0.7", {"WEIGHT_DECAY": 0.7}),
-    ("weight_decay=1.0", {"WEIGHT_DECAY": 1.0}),
-    ("lr=4e-3 wd=0.5", {"LEARNING_RATE": 4e-3}),
-    ("lr=2e-3 wd=0.5", {"LEARNING_RATE": 2e-3}),
-    ("dropout=0.15 wd=0.5", {"DROPOUT": 0.15}),
-    ("dropout=0.2 wd=0.5", {"DROPOUT": 0.2}),
-    ("warmup=50 wd=0.5", {"WARMUP_STEPS": 50}),
-    ("warmup=300 wd=0.5", {"WARMUP_STEPS": 300}),
-    ("6L 320d wd=0.5", {"DEPTH": 6}),
-    ("8L 256d wd=0.5", {"DEPTH": 8, "N_EMBD": 256}),
-    ("SwiGLU wd=0.5", {"USE_SWIGLU": True}),
-    ("bs=16 wd=0.5 (more steps)", {"BATCH_SIZE": 16}),
+    # Combine the two best findings
+    ("bs=16 + wd=0.7 (combo)", {"WEIGHT_DECAY": 0.7}),
+    # Even smaller batch = even more steps
+    ("bs=8 (4x more steps)", {"BATCH_SIZE": 8}),
+    # Higher LR might work better with small batch
+    ("bs=16 lr=4e-3", {"LEARNING_RATE": 4e-3}),
+    ("bs=16 lr=5e-3", {"LEARNING_RATE": 5e-3}),
+    # Dropout sweep at new baseline
+    ("bs=16 dropout=0.15", {"DROPOUT": 0.15}),
+    ("bs=16 dropout=0.2", {"DROPOUT": 0.2}),
+    # Deeper model with small batch (more steps for more params)
+    ("6L 320d bs=16", {"DEPTH": 6}),
+    ("7L 320d bs=16", {"DEPTH": 7}),
+    # Wider model
+    ("5L 384d bs=16", {"N_EMBD": 384}),
+    # Gradient clip sweep
+    ("bs=16 grad_clip=0.5", {"GRAD_CLIP": 0.5}),
 ]
 
 
@@ -64,7 +74,6 @@ def get_next_run_number():
         return 1
     with open(RESULTS_TSV) as f:
         lines = f.readlines()
-    # Last non-empty line
     for line in reversed(lines):
         line = line.strip()
         if line and not line.startswith("run"):
@@ -79,16 +88,11 @@ def apply_config(overrides):
         src = f.read()
 
     for key, val in config.items():
-        # Match patterns like: DEPTH = 5 or LEARNING_RATE = 3e-3 or USE_SWIGLU = False
         if isinstance(val, bool):
             val_str = str(val)
         elif isinstance(val, float):
-            # Keep scientific notation for small floats
             if val < 0.01:
-                val_str = f"{val:.0e}".replace("+0", "+").replace("-0", "-").replace("e-", "e-").replace("e+", "e+")
-                # Simplify: 3e-03 -> 3e-3
                 val_str = re.sub(r'e([+-])0*(\d+)', r'e\1\2', f"{val:e}")
-                # Prefer compact: 3.000000e-03 -> 3e-3
                 mantissa, exp = val_str.split("e")
                 mantissa = mantissa.rstrip("0").rstrip(".")
                 val_str = f"{mantissa}e{exp}"
@@ -119,26 +123,25 @@ def run_training(timeout=660):
     except subprocess.TimeoutExpired:
         return None, None, "TIMEOUT"
 
-    # Parse val loss
     val_match = re.search(r'Val loss:\s*([\d.]+)', output)
     val_loss = float(val_match.group(1)) if val_match else None
 
-    # Parse params
     params_match = re.search(r'Model:\s*([\d.]+)M', output)
     params_M = float(params_match.group(1)) if params_match else None
 
     return val_loss, params_M, output
 
 
-def append_result(run_num, val_loss, params_M, status, description):
+def append_result(run_num, val_loss, params_M, status, time_s, description):
     """Append a row to results.tsv."""
+    improv = (BASELINE_LOSS - val_loss) / BASELINE_LOSS * 100
     with open(RESULTS_TSV, "a") as f:
-        f.write(f"{run_num:03d}\t{val_loss:.4f}\t{params_M}\t{status}\t{description}\n")
+        f.write(f"{run_num:03d}\t{val_loss:.4f}\t{params_M}\t{status}\t{time_s}\t{improv:.1f}\t{description}\n")
 
 
 def generate_plot():
     """Regenerate experiments_plot.png from results.tsv."""
-    runs, losses, statuses, descs, params = [], [], [], [], []
+    runs, losses, statuses, descs, params, improvs = [], [], [], [], [], []
     with open(RESULTS_TSV) as f:
         reader = csv.DictReader(f, delimiter="\t")
         for row in reader:
@@ -147,29 +150,36 @@ def generate_plot():
             statuses.append(row["status"])
             descs.append(row["description"])
             params.append(float(row["params_M"]))
+            improvs.append(float(row["improv_%"]))
 
-    fig, (ax_main, ax_zoom) = plt.subplots(1, 2, figsize=(20, 8),
-                                            gridspec_kw={"width_ratios": [3, 2]})
+    fig = plt.figure(figsize=(22, 10))
     fig.patch.set_facecolor("#0d1117")
 
-    for ax in (ax_main, ax_zoom):
+    # Layout: main plot left (wide), improvement % right (narrow)
+    gs = fig.add_gridspec(2, 2, width_ratios=[3, 2], height_ratios=[3, 1],
+                          hspace=0.35, wspace=0.3)
+    ax_main = fig.add_subplot(gs[0, 0])
+    ax_zoom = fig.add_subplot(gs[0, 1])
+    ax_bar = fig.add_subplot(gs[1, :])
+
+    for ax in (ax_main, ax_zoom, ax_bar):
         ax.set_facecolor("#161b22")
-        ax.tick_params(colors="#8b949e")
-        ax.spines["bottom"].set_color("#30363d")
-        ax.spines["left"].set_color("#30363d")
+        ax.tick_params(colors="#8b949e", labelsize=8)
+        for spine in ax.spines.values():
+            spine.set_color("#30363d")
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
-        ax.grid(True, alpha=0.15, color="#8b949e")
+        ax.grid(True, alpha=0.12, color="#8b949e")
 
-    # --- LEFT: Full view ---
+    # ── LEFT: Full view ──
     keep_x = [r for r, s in zip(runs, statuses) if s == "keep"]
     keep_y = [l for l, s in zip(losses, statuses) if s == "keep"]
     disc_x = [r for r, s in zip(runs, statuses) if s == "discard"]
     disc_y = [l for l, s in zip(losses, statuses) if s == "discard"]
 
-    ax_main.plot(runs, losses, c="#30363d", alpha=0.5, linewidth=1, zorder=1)
-    ax_main.scatter(disc_x, disc_y, c="#f85149", s=50, zorder=3, label="discard", alpha=0.6, marker="x", linewidths=2)
-    ax_main.scatter(keep_x, keep_y, c="#3fb950", s=90, zorder=4, label="keep", edgecolors="white", linewidth=1)
+    ax_main.plot(runs, losses, c="#30363d", alpha=0.4, linewidth=1, zorder=1)
+    ax_main.scatter(disc_x, disc_y, c="#f85149", s=40, zorder=3, alpha=0.5, marker="x", linewidths=1.5)
+    ax_main.scatter(keep_x, keep_y, c="#3fb950", s=70, zorder=4, edgecolors="white", linewidth=0.8)
 
     # Best envelope
     best_so_far = []
@@ -177,90 +187,113 @@ def generate_plot():
     for l in losses:
         current_best = min(current_best, l)
         best_so_far.append(current_best)
-    ax_main.plot(runs, best_so_far, c="#3fb950", linewidth=2.5, alpha=0.8, linestyle="--", label="best so far", zorder=2)
+    ax_main.plot(runs, best_so_far, c="#3fb950", linewidth=2.5, alpha=0.8,
+                 linestyle="--", label="best so far", zorder=2)
 
-    # Annotate only milestones (kept experiments that improved best)
+    # Target line at 35%
+    target_35 = BASELINE_LOSS * 0.65
+    ax_main.axhline(y=target_35, color="#f0883e", linewidth=1.5, linestyle=":",
+                     alpha=0.7, label=f"35% target ({target_35:.3f})", zorder=1)
+
+    # Annotate only milestones that improved best
     prev_best = float("inf")
+    milestone_count = 0
     for r, l, s, d in zip(runs, losses, statuses, descs):
         if s == "keep" and l < prev_best:
             short = d.split(" - ")[0] if " - " in d else d
-            short = short[:35]
+            short = short[:30]
+            improv_pct = (BASELINE_LOSS - l) / BASELINE_LOSS * 100
+            # Alternate annotation position to avoid overlap
+            offset_y = 14 if milestone_count % 2 == 0 else -18
             ax_main.annotate(
-                f"#{r}: {short}\n({l:.4f})",
+                f"#{r} ({improv_pct:.0f}%)",
                 (r, l), fontsize=7, fontweight="bold",
-                textcoords="offset points", xytext=(8, 12),
+                textcoords="offset points", xytext=(6, offset_y),
                 color="#3fb950",
-                arrowprops=dict(arrowstyle="-", color="#3fb950", alpha=0.4, lw=0.8),
-                bbox=dict(boxstyle="round,pad=0.2", fc="#0d1117", ec="#3fb950", alpha=0.7, lw=0.5),
+                arrowprops=dict(arrowstyle="-", color="#3fb950", alpha=0.3, lw=0.6),
+                bbox=dict(boxstyle="round,pad=0.15", fc="#0d1117", ec="#3fb950", alpha=0.6, lw=0.4),
             )
             prev_best = l
+            milestone_count += 1
 
-    ax_main.set_xlabel("Experiment #", fontsize=12, color="#c9d1d9")
-    ax_main.set_ylabel("Validation Loss", fontsize=12, color="#c9d1d9")
-    ax_main.set_title("All Experiments", fontsize=14, fontweight="bold", color="#c9d1d9")
+    ax_main.set_xlabel("Experiment #", fontsize=11, color="#c9d1d9")
+    ax_main.set_ylabel("Validation Loss", fontsize=11, color="#c9d1d9")
+    ax_main.set_title("All Experiments", fontsize=13, fontweight="bold", color="#c9d1d9")
     ax_main.legend(loc="upper right", facecolor="#161b22", edgecolor="#30363d",
-                   labelcolor="#c9d1d9", fontsize=9)
+                   labelcolor="#c9d1d9", fontsize=8)
 
-    # --- RIGHT: Zoomed view (only the competitive region) ---
-    # Filter to experiments with loss < 2.0
-    zoom_threshold = 1.85
-    z_runs = [r for r, l in zip(runs, losses) if l <= zoom_threshold]
-    z_losses = [l for r, l in zip(runs, losses) if l <= zoom_threshold]
-    z_statuses = [s for l, s in zip(losses, statuses) if l <= zoom_threshold]
-    z_descs = [d for l, d in zip(losses, descs) if l <= zoom_threshold]
+    # ── RIGHT: Zoomed (auto-range to competitive region) ──
+    best_loss = min(losses)
+    zoom_lo = best_loss - 0.03
+    zoom_hi = best_loss + 0.15
+    z_idx = [i for i, l in enumerate(losses) if zoom_lo <= l <= zoom_hi]
 
-    zk_x = [r for r, s in zip(z_runs, z_statuses) if s == "keep"]
-    zk_y = [l for l, s in zip(z_losses, z_statuses) if s == "keep"]
-    zd_x = [r for r, s in zip(z_runs, z_statuses) if s == "discard"]
-    zd_y = [l for l, s in zip(z_losses, z_statuses) if s == "discard"]
+    if len(z_idx) < 5:  # widen if too few points
+        zoom_hi = best_loss + 0.25
+        z_idx = [i for i, l in enumerate(losses) if zoom_lo <= l <= zoom_hi]
 
-    ax_zoom.scatter(zd_x, zd_y, c="#f85149", s=60, zorder=3, alpha=0.6, marker="x", linewidths=2)
-    ax_zoom.scatter(zk_x, zk_y, c="#3fb950", s=100, zorder=4, edgecolors="white", linewidth=1)
+    z_runs = [runs[i] for i in z_idx]
+    z_losses = [losses[i] for i in z_idx]
+    z_statuses = [statuses[i] for i in z_idx]
+    z_descs = [descs[i] for i in z_idx]
 
-    # Annotate all in zoomed view
+    zk = [(r, l) for r, l, s in zip(z_runs, z_losses, z_statuses) if s == "keep"]
+    zd = [(r, l) for r, l, s in zip(z_runs, z_losses, z_statuses) if s == "discard"]
+
+    if zd:
+        ax_zoom.scatter([x[0] for x in zd], [x[1] for x in zd],
+                       c="#f85149", s=50, zorder=3, alpha=0.5, marker="x", linewidths=1.5)
+    if zk:
+        ax_zoom.scatter([x[0] for x in zk], [x[1] for x in zk],
+                       c="#3fb950", s=80, zorder=4, edgecolors="white", linewidth=0.8)
+
+    # Annotate zoomed view - only label each point with short desc
+    from matplotlib.patches import FancyBboxPatch
+    used_positions = []
     for r, l, s, d in zip(z_runs, z_losses, z_statuses, z_descs):
         short = d.split(" - ")[0] if " - " in d else d
-        short = short[:30]
-        color = "#3fb950" if s == "keep" else "#f85149"
-        ax_zoom.annotate(
-            f"{short}",
-            (r, l), fontsize=6.5,
-            textcoords="offset points", xytext=(6, 6),
-            color=color, alpha=0.9, rotation=20,
-        )
+        short = short[:25]
+        color = "#3fb950" if s == "keep" else "#f8514966"
+        # Only annotate kept ones in zoom to reduce clutter
+        if s == "keep":
+            ax_zoom.annotate(
+                short, (r, l), fontsize=6, color=color,
+                textcoords="offset points", xytext=(5, 5), rotation=15,
+            )
 
-    # Best line in zoom
-    z_best = []
-    cb = float("inf")
-    for r, l in zip(runs, losses):
-        cb = min(cb, l)
-        if l <= zoom_threshold:
-            z_best.append((r, cb))
-    if z_best:
-        ax_zoom.plot([x[0] for x in z_best], [x[1] for x in z_best],
-                     c="#3fb950", linewidth=2, alpha=0.6, linestyle="--")
+    ax_zoom.axhline(y=target_35, color="#f0883e", linewidth=1.5, linestyle=":", alpha=0.7)
+    ax_zoom.set_ylim(zoom_lo, zoom_hi)
+    ax_zoom.set_xlabel("Experiment #", fontsize=11, color="#c9d1d9")
+    ax_zoom.set_ylabel("Validation Loss", fontsize=11, color="#c9d1d9")
+    ax_zoom.set_title("Zoomed: Competitive Region", fontsize=13, fontweight="bold", color="#c9d1d9")
 
-    ax_zoom.set_xlabel("Experiment #", fontsize=12, color="#c9d1d9")
-    ax_zoom.set_ylabel("Validation Loss", fontsize=12, color="#c9d1d9")
-    ax_zoom.set_title(f"Zoomed: Loss < {zoom_threshold}", fontsize=14, fontweight="bold", color="#c9d1d9")
+    # ── BOTTOM: Improvement % bar chart ──
+    colors = ["#3fb950" if s == "keep" else "#f8514944" for s in statuses]
+    ax_bar.bar(runs, improvs, color=colors, width=0.8, zorder=3)
+    ax_bar.axhline(y=0, color="#8b949e", linewidth=0.5)
+    ax_bar.axhline(y=35, color="#f0883e", linewidth=1.5, linestyle=":", alpha=0.7, label="35% target")
+    ax_bar.set_xlabel("Experiment #", fontsize=11, color="#c9d1d9")
+    ax_bar.set_ylabel("Improvement %", fontsize=11, color="#c9d1d9")
+    ax_bar.set_title("Improvement over Baseline (higher = better)", fontsize=13,
+                     fontweight="bold", color="#c9d1d9")
+    ax_bar.legend(loc="lower right", facecolor="#161b22", edgecolor="#30363d",
+                  labelcolor="#c9d1d9", fontsize=8)
+    ax_bar.yaxis.set_major_formatter(mticker.FormatStrFormatter('%d%%'))
 
-    # Summary stats text box
-    best_loss = min(losses)
+    # Summary
     best_idx = losses.index(best_loss)
-    best_desc = descs[best_idx]
+    best_improv = (BASELINE_LOSS - best_loss) / BASELINE_LOSS * 100
     summary = (
-        f"Total experiments: {len(runs)}\n"
-        f"Best val_loss: {best_loss:.4f} (#{runs[best_idx]})\n"
-        f"Best config: {best_desc[:50]}\n"
-        f"Improvement: {((losses[0] - best_loss) / losses[0] * 100):.1f}% from baseline"
+        f"Experiments: {len(runs)}  |  "
+        f"Best: {best_loss:.4f} (#{runs[best_idx]}, {best_improv:.1f}% improvement)  |  "
+        f"Target: {target_35:.4f} (35%)"
     )
-    fig.text(0.5, 0.01, summary, ha="center", fontsize=10, color="#8b949e",
-             family="monospace",
-             bbox=dict(boxstyle="round,pad=0.5", fc="#161b22", ec="#30363d", alpha=0.9))
+    fig.text(0.5, 0.005, summary, ha="center", fontsize=11, color="#58a6ff",
+             family="monospace", fontweight="bold",
+             bbox=dict(boxstyle="round,pad=0.4", fc="#161b22", ec="#58a6ff", alpha=0.9, lw=1))
 
-    fig.suptitle("Autoresearch: NLQ → Python Code Model", fontsize=16,
-                 fontweight="bold", color="#58a6ff", y=0.98)
-    fig.tight_layout(rect=[0, 0.06, 1, 0.95])
+    fig.suptitle("Autoresearch: NLQ → Python Code Model", fontsize=17,
+                 fontweight="bold", color="#58a6ff", y=0.99)
     fig.savefig(PLOT_PATH, dpi=150, bbox_inches="tight", facecolor=fig.get_facecolor())
     plt.close(fig)
     print(f"  Plot saved to {PLOT_PATH}")
@@ -269,10 +302,11 @@ def generate_plot():
 def git_commit_and_push(run_num, description, val_loss):
     """Commit results + plot + any train_mlx changes, push to GitHub."""
     subprocess.run(["git", "add", "results.tsv", "experiments_plot.png", "train_mlx.py",
-                    "checkpoint/config.json"],
+                    "checkpoint/config.json", "index.html"],
                    cwd=BASE_DIR, capture_output=True)
 
-    msg = f"exp {run_num:03d}: {description} (val={val_loss:.4f})"
+    improv = (BASELINE_LOSS - val_loss) / BASELINE_LOSS * 100
+    msg = f"exp {run_num:03d}: {description} (val={val_loss:.4f}, {improv:.1f}%)"
     subprocess.run(["git", "commit", "-m", msg], cwd=BASE_DIR, capture_output=True)
     result = subprocess.run(["git", "push", "nipun", "master"],
                            cwd=BASE_DIR, capture_output=True, text=True)
@@ -285,6 +319,7 @@ def git_commit_and_push(run_num, description, val_loss):
 def main():
     print("=" * 60)
     print("AUTORESEARCH EXPERIMENT HARNESS")
+    print(f"Target: 35% improvement (val_loss < {BASELINE_LOSS * 0.65:.4f})")
     print("=" * 60)
 
     # Track best val_loss from existing results
@@ -295,7 +330,8 @@ def main():
             for row in reader:
                 if row["status"] == "keep":
                     best_val_loss = min(best_val_loss, float(row["val_loss"]))
-    print(f"\nCurrent best val_loss: {best_val_loss:.4f}")
+    best_improv = (BASELINE_LOSS - best_val_loss) / BASELINE_LOSS * 100
+    print(f"\nCurrent best val_loss: {best_val_loss:.4f} ({best_improv:.1f}% improvement)")
     print(f"Experiments to run: {len(EXPERIMENTS)}")
     print()
 
@@ -313,30 +349,29 @@ def main():
         # Train
         t0 = time.time()
         val_loss, params_M, output = run_training(timeout=660)
-        elapsed = time.time() - t0
+        elapsed = int(time.time() - t0)
 
         if val_loss is None:
             print(f"  FAILED (no val_loss parsed). Skipping.")
-            # Revert to best config
             apply_config({})
             continue
 
         # Determine status
+        improv = (BASELINE_LOSS - val_loss) / BASELINE_LOSS * 100
         if val_loss < best_val_loss:
             status = "keep"
             best_val_loss = val_loss
-            improvement = "NEW BEST!"
+            tag = "NEW BEST!"
         else:
             status = "discard"
-            improvement = ""
-            # Revert config to best
+            tag = ""
             apply_config({})
 
-        desc_full = f"{desc} {improvement}".strip()
-        print(f"  Val loss: {val_loss:.4f} | Params: {params_M}M | Status: {status} | {elapsed:.0f}s")
+        desc_full = f"{desc} {tag}".strip()
+        print(f"  Val loss: {val_loss:.4f} | {improv:.1f}% | Params: {params_M}M | {status} | {elapsed}s")
 
         # Update TSV
-        append_result(run_num, val_loss, params_M, status, desc_full)
+        append_result(run_num, val_loss, params_M, status, elapsed, desc_full)
         print(f"  Updated results.tsv")
 
         # Regenerate plot
@@ -346,9 +381,11 @@ def main():
         git_commit_and_push(run_num, desc_full, val_loss)
 
     # Final summary
+    best_improv = (BASELINE_LOSS - best_val_loss) / BASELINE_LOSS * 100
     print(f"\n{'='*60}")
     print(f"ALL EXPERIMENTS COMPLETE")
-    print(f"Best val_loss: {best_val_loss:.4f}")
+    print(f"Best val_loss: {best_val_loss:.4f} ({best_improv:.1f}% improvement)")
+    print(f"Target was: {BASELINE_LOSS * 0.65:.4f} (35%)")
     print(f"{'='*60}")
 
 
