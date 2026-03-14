@@ -63,3 +63,4 @@ run	val_loss	params_M	status	time_s	improv_%	description
 062	1.5092	6.8	discard	306	27.0	bs=8 + wd=0.7
 063	1.5372	6.8	discard	306	25.7	bs=8 + wd=1.0
 064	1.5222	6.8	discard	306	26.4	bs=8 lr=4e-3
+065	1.5141	6.8	discard	306	26.8	bs=8 lr=2e-3
