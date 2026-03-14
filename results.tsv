@@ -77,3 +77,4 @@ run	val_loss	params_M	status	time_s	improv_%	description
 076	1.4705	6.8	discard	306	28.9	combo + dropout=0.25
 077	1.4681	6.8	keep	306	29.0	combo + dropout=0.3 NEW BEST!
 078	1.4816	6.8	discard	306	28.4	combo + grad_clip=0.5
+079	1.4719	8.0	discard	306	28.8	combo + 6L
