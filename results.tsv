@@ -39,3 +39,4 @@ run	val_loss	params_M	status	description
 038	1.6130	6.8	keep	weight_decay=0.7 NEW BEST!
 039	1.6154	6.8	discard	weight_decay=1.0
 040	1.6676	6.8	discard	lr=4e-3 wd=0.5
+041	1.6818	6.8	discard	lr=2e-3 wd=0.5
