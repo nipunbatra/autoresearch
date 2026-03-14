@@ -1,16 +1,16 @@
 {
   "config": {
     "vocab_size": 2048,
-    "n_layer": 5,
+    "n_layer": 6,
     "n_head": 5,
     "n_kv_head": 5,
     "n_embd": 320,
     "head_dim": 64,
     "seq_len": 512
   },
-  "val_loss": 1.6465757250785829,
-  "n_params_M": 6.80288,
-  "step": 1560,
-  "total_tokens_M": 25.55904,
-  "training_seconds": 300.1526126861572
+  "val_loss": 1.6486190676689148,
+  "n_params_M": 8.03232,
+  "step": 1311,
+  "total_tokens_M": 21.479424,
+  "training_seconds": 300.2140591144562
 }
