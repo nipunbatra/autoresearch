@@ -32,13 +32,14 @@ BEST_CONFIG = {
     "HEAD_DIM": 64,
     "MLP_RATIO": 4,
     "USE_SWIGLU": False,
-    "DROPOUT": 0.2,
+    "DROPOUT": 0.3,
     "BATCH_SIZE": 8,
     "LEARNING_RATE": 3e-3,
     "WEIGHT_DECAY": 0.5,
     "WARMUP_STEPS": 300,
     "TIME_BUDGET": 300,
     "GRAD_CLIP": 1.0,
+    "DECAY_STEPS": 5000,
     "USE_LION": False,
     "TIED_EMBEDDINGS": True,
     "MAX_SEQ_LEN": 512,
@@ -47,25 +48,26 @@ BEST_CONFIG = {
 # --- Experiments to run ---
 # Each experiment: (description, {overrides})
 # Target: 35% improvement = val_loss < 1.345
-# Best config: bs=8 + dropout=0.2 + warmup=300 (accumulated from 051+067+068)
-# NOTE: Previous rounds tested these individually. This round combines them.
+# Best config: bs=8 + dropout=0.3 + warmup=300 + wd=0.5
+# Plateau at ~29%. Need fundamentally different levers.
 EXPERIMENTS = [
-    # First: test the accumulated combo (all 3 wins together)
-    ("COMBO bs=8+drop=0.2+warm=300", {}),  # just the new BEST_CONFIG
-    # Weight decay sweep on the combo
-    ("combo + wd=0.7", {"WEIGHT_DECAY": 0.7}),
-    ("combo + wd=1.0", {"WEIGHT_DECAY": 1.0}),
-    # LR sweep on the combo
-    ("combo + lr=4e-3", {"LEARNING_RATE": 4e-3}),
-    ("combo + lr=2e-3", {"LEARNING_RATE": 2e-3}),
-    ("combo + lr=5e-3", {"LEARNING_RATE": 5e-3}),
-    # Dropout fine-tune
-    ("combo + dropout=0.25", {"DROPOUT": 0.25}),
-    ("combo + dropout=0.3", {"DROPOUT": 0.3}),
-    # Grad clip
-    ("combo + grad_clip=0.5", {"GRAD_CLIP": 0.5}),
-    # Deeper with all tricks
-    ("combo + 6L", {"DEPTH": 6}),
+    # Cosine schedule tuning (bs=8 does ~1900 steps, current decay=5000)
+    ("decay=2000 (match steps)", {"DECAY_STEPS": 2000}),
+    ("decay=3000", {"DECAY_STEPS": 3000}),
+    ("decay=8000 (slower decay)", {"DECAY_STEPS": 8000}),
+    # Higher LR + matched decay (squeeze more from schedule)
+    ("lr=4e-3 decay=2000", {"LEARNING_RATE": 4e-3, "DECAY_STEPS": 2000}),
+    ("lr=5e-3 decay=2000", {"LEARNING_RATE": 5e-3, "DECAY_STEPS": 2000}),
+    # 7 min training (more steps, adjusted decay)
+    ("7min decay=3500", {"TIME_BUDGET": 420, "DECAY_STEPS": 3500}),
+    # Weight decay + deeper
+    ("wd=0.7 + 6L", {"WEIGHT_DECAY": 0.7, "DEPTH": 6}),
+    # Small model many steps (3.9M params, even faster per step)
+    ("8L 192d (tiny+deep)", {"DEPTH": 8, "N_EMBD": 192}),
+    # Aggressive regularization combo
+    ("drop=0.3 wd=1.0 decay=3000", {"DROPOUT": 0.3, "WEIGHT_DECAY": 1.0, "DECAY_STEPS": 3000}),
+    # Very high LR with short decay (aggressive start, fast cooldown)
+    ("lr=8e-3 decay=1500 warm=100", {"LEARNING_RATE": 8e-3, "DECAY_STEPS": 1500, "WARMUP_STEPS": 100}),
 ]
 
 

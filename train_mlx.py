@@ -52,6 +52,7 @@ WEIGHT_DECAY = 0.5
 WARMUP_STEPS = 300
 TIME_BUDGET = 300
 GRAD_CLIP = 1.0
+DECAY_STEPS = 5000
 USE_LION = False
 
 # ---------------------------------------------------------------------------
@@ -308,7 +309,7 @@ def train():
 
     # Optimizer with warmup cosine schedule
     warmup = optim.linear_schedule(1e-7, LEARNING_RATE, steps=WARMUP_STEPS)
-    cosine = optim.cosine_decay(LEARNING_RATE, decay_steps=5000)
+    cosine = optim.cosine_decay(LEARNING_RATE, decay_steps=DECAY_STEPS)
     schedule = optim.join_schedules([warmup, cosine], [WARMUP_STEPS])
     if USE_LION:
         optimizer = optim.Lion(learning_rate=schedule, weight_decay=WEIGHT_DECAY)
