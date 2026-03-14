@@ -32,11 +32,11 @@ BEST_CONFIG = {
     "HEAD_DIM": 64,
     "MLP_RATIO": 4,
     "USE_SWIGLU": False,
-    "DROPOUT": 0.1,
+    "DROPOUT": 0.2,
     "BATCH_SIZE": 8,
     "LEARNING_RATE": 3e-3,
     "WEIGHT_DECAY": 0.5,
-    "WARMUP_STEPS": 150,
+    "WARMUP_STEPS": 300,
     "TIME_BUDGET": 300,
     "GRAD_CLIP": 1.0,
     "USE_LION": False,
@@ -47,24 +47,25 @@ BEST_CONFIG = {
 # --- Experiments to run ---
 # Each experiment: (description, {overrides})
 # Target: 35% improvement = val_loss < 1.345
-# Current best: bs=8 (1.5004, 27.5%)
+# Best config: bs=8 + dropout=0.2 + warmup=300 (accumulated from 051+067+068)
+# NOTE: Previous rounds tested these individually. This round combines them.
 EXPERIMENTS = [
-    # Push batch size even lower
-    ("bs=4 (8x more steps)", {"BATCH_SIZE": 4}),
-    ("bs=2 (16x more steps)", {"BATCH_SIZE": 2}),
-    # Combine bs=8 with wd=0.7
-    ("bs=8 + wd=0.7", {"WEIGHT_DECAY": 0.7}),
-    ("bs=8 + wd=1.0", {"WEIGHT_DECAY": 1.0}),
-    # Higher LR with small batch (linear scaling rule)
-    ("bs=8 lr=4e-3", {"LEARNING_RATE": 4e-3}),
-    ("bs=8 lr=2e-3", {"LEARNING_RATE": 2e-3}),
-    # Dropout with small batch
-    ("bs=8 dropout=0.15", {"DROPOUT": 0.15}),
-    ("bs=8 dropout=0.2", {"DROPOUT": 0.2}),
-    # More warmup for small batch (more noisy gradients)
-    ("bs=8 warmup=300", {"WARMUP_STEPS": 300}),
-    # Deeper + small batch
-    ("6L bs=8", {"DEPTH": 6}),
+    # First: test the accumulated combo (all 3 wins together)
+    ("COMBO bs=8+drop=0.2+warm=300", {}),  # just the new BEST_CONFIG
+    # Weight decay sweep on the combo
+    ("combo + wd=0.7", {"WEIGHT_DECAY": 0.7}),
+    ("combo + wd=1.0", {"WEIGHT_DECAY": 1.0}),
+    # LR sweep on the combo
+    ("combo + lr=4e-3", {"LEARNING_RATE": 4e-3}),
+    ("combo + lr=2e-3", {"LEARNING_RATE": 2e-3}),
+    ("combo + lr=5e-3", {"LEARNING_RATE": 5e-3}),
+    # Dropout fine-tune
+    ("combo + dropout=0.25", {"DROPOUT": 0.25}),
+    ("combo + dropout=0.3", {"DROPOUT": 0.3}),
+    # Grad clip
+    ("combo + grad_clip=0.5", {"GRAD_CLIP": 0.5}),
+    # Deeper with all tricks
+    ("combo + 6L", {"DEPTH": 6}),
 ]
 
 
