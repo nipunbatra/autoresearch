@@ -80,3 +80,4 @@ run	val_loss	params_M	status	time_s	improv_%	description
 079	1.4719	8.0	discard	306	28.8	combo + 6L
 080	1.5648	6.8	discard	306	24.4	decay=2000 (match steps)
 081	1.4876	6.8	discard	306	28.1	decay=3000
+082	1.5154	6.8	discard	306	26.7	decay=8000 (slower decay)
