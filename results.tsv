@@ -92,3 +92,4 @@ run	val_loss	params_M	status	time_s	improv_%	description
 088	1.5536	6.8	discard	306	24.9	drop=0.3 wd=1.0 decay=3000
 088	1.6145	3.9	discard	306	22.0	8L 192d (tiny+deep)
 089	2.5116	6.8	discard	307	-21.4	lr=8e-3 decay=1500 warm=100
+089	2.4671	6.8	discard	306	-19.3	lr=8e-3 decay=1500 warm=100
