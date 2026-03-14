@@ -48,9 +48,9 @@ DROPOUT = 0.1
 # Training
 BATCH_SIZE = 32
 LEARNING_RATE = 3e-3
-WEIGHT_DECAY = 0.5
+WEIGHT_DECAY = 0.7
 WARMUP_STEPS = 150
-TIME_BUDGET = 300  # 5 minutes
+TIME_BUDGET = 300
 GRAD_CLIP = 1.0
 USE_LION = False
 
@@ -237,7 +237,7 @@ class Block(nn.Module):
         return x
 
 
-TIED_EMBEDDINGS = True  # share wte and lm_head weights
+TIED_EMBEDDINGS = True
 
 class GPT(nn.Module):
     def __init__(self, config):

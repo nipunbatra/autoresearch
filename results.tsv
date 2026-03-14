@@ -36,3 +36,4 @@ run	val_loss	params_M	status	description
 035	1.7333	6.8	discard	GELU activation - ReLU squared is better
 036	2.1468	6.8	discard	weight_decay=0.1 - too little regularization
 037	1.6548	6.8	keep	weight_decay=0.5 + 10x data - NEW BEST!
+038	1.6130	6.8	keep	weight_decay=0.7 NEW BEST!
