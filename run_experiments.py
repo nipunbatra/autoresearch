@@ -32,14 +32,15 @@ BEST_CONFIG = {
     "HEAD_DIM": 64,
     "MLP_RATIO": 4,
     "USE_SWIGLU": False,
-    "DROPOUT": 0.3,
+    "DROPOUT": 0.2,
     "BATCH_SIZE": 8,
     "LEARNING_RATE": 3e-3,
     "WEIGHT_DECAY": 0.5,
     "WARMUP_STEPS": 300,
     "TIME_BUDGET": 300,
     "GRAD_CLIP": 1.0,
-    "DECAY_STEPS": 5000,
+    "DECAY_STEPS": 8000,
+    "TIME_BUDGET": 600,
     "USE_LION": False,
     "TIED_EMBEDDINGS": True,
     "MAX_SEQ_LEN": 512,
@@ -51,23 +52,22 @@ BEST_CONFIG = {
 # Best config: bs=8 + dropout=0.3 + warmup=300 + wd=0.5
 # Plateau at ~29%. Need fundamentally different levers.
 EXPERIMENTS = [
-    # Remaining from round 5 + new ideas
-    ("lr=5e-3 decay=2000", {"LEARNING_RATE": 5e-3, "DECAY_STEPS": 2000}),
-    ("7min decay=3500", {"TIME_BUDGET": 420, "DECAY_STEPS": 3500}),
-    ("7min bs=8 lr=2e-3 decay=3500", {"TIME_BUDGET": 420, "DECAY_STEPS": 3500, "LEARNING_RATE": 2e-3}),
-    ("8L 192d (tiny+deep)", {"DEPTH": 8, "N_EMBD": 192}),
-    ("lr=8e-3 decay=1500 warm=100", {"LEARNING_RATE": 8e-3, "DECAY_STEPS": 1500, "WARMUP_STEPS": 100}),
-    # Gradient accumulation via 2 mini-batches (bs=4 x2 = effective bs=8)
-    # Actually just try bs=4 with higher LR to compensate
-    ("bs=4 lr=2e-3 decay=3000", {"BATCH_SIZE": 4, "LEARNING_RATE": 2e-3, "DECAY_STEPS": 3000}),
-    # MLP ratio 3 (fewer params per layer = faster = more steps)
-    ("mlp_ratio=3 bs=8", {"MLP_RATIO": 3}),
-    # Wide + shallow (more capacity per step)
-    ("3L 448d bs=8", {"DEPTH": 3, "N_EMBD": 448}),
-    # 10 min with very slow decay
-    ("10min decay=6000", {"TIME_BUDGET": 600, "DECAY_STEPS": 6000}),
-    # The nuclear option: everything at once
-    ("10min bs=4 lr=2e-3 drop=0.3 wd=0.7", {"TIME_BUDGET": 600, "BATCH_SIZE": 4, "LEARNING_RATE": 2e-3, "WEIGHT_DECAY": 0.7, "DECAY_STEPS": 6000}),
+    # Round 6: optimize on top of 5x data + 10min baseline (val=1.3218, 36.1%)
+    # LR sweep (with more data, optimal LR may shift)
+    ("5xdata lr=4e-3", {"LEARNING_RATE": 4e-3}),
+    ("5xdata lr=2e-3", {"LEARNING_RATE": 2e-3}),
+    ("5xdata lr=5e-3", {"LEARNING_RATE": 5e-3}),
+    # Weight decay sweep
+    ("5xdata wd=0.3", {"WEIGHT_DECAY": 0.3}),
+    ("5xdata wd=0.7", {"WEIGHT_DECAY": 0.7}),
+    # Batch size (with 5x data, maybe bs=16 works now — less overfitting)
+    ("5xdata bs=16", {"BATCH_SIZE": 16}),
+    ("5xdata bs=4", {"BATCH_SIZE": 4}),
+    # Dropout (with more data, maybe less dropout needed)
+    ("5xdata dropout=0.1", {"DROPOUT": 0.1}),
+    ("5xdata dropout=0.3", {"DROPOUT": 0.3}),
+    # Deeper model (more data can support more params)
+    ("5xdata 6L", {"DEPTH": 6}),
 ]
 
 
