@@ -85,3 +85,4 @@ run	val_loss	params_M	status	time_s	improv_%	description
 084	1.6531	6.8	discard	306	20.1	lr=5e-3 decay=2000
 085	1.6744	6.8	discard	306	19.1	lr=5e-3 decay=2000
 085	1.4768	6.8	discard	426	28.6	7min decay=3500
+086	1.6335	8.0	discard	307	21.0	wd=0.7 + 6L
