@@ -82,14 +82,10 @@ run	val_loss	params_M	status	time_s	improv_%	description
 081	1.4876	6.8	discard	306	28.1	decay=3000
 082	1.5154	6.8	discard	306	26.7	decay=8000 (slower decay)
 083	1.6228	6.8	discard	306	21.6	lr=4e-3 decay=2000
-084	1.6531	6.8	discard	306	20.1	lr=5e-3 decay=2000
-085	1.6744	6.8	discard	306	19.1	lr=5e-3 decay=2000
-085	1.4768	6.8	discard	426	28.6	7min decay=3500
-086	1.6335	8.0	discard	307	21.0	wd=0.7 + 6L
-086	1.4740	6.8	discard	426	28.7	7min decay=3500
-087	1.5965	3.9	discard	306	22.8	8L 192d (tiny+deep)
-087	1.5022	6.8	discard	426	27.4	7min bs=8 lr=2e-3 decay=3500
-088	1.5536	6.8	discard	306	24.9	drop=0.3 wd=1.0 decay=3000
-088	1.6145	3.9	discard	306	22.0	8L 192d (tiny+deep)
-089	2.5116	6.8	discard	307	-21.4	lr=8e-3 decay=1500 warm=100
-089	2.4671	6.8	discard	306	-19.3	lr=8e-3 decay=1500 warm=100
+084	1.4768	6.8	discard	426	28.6	7min decay=3500
+085	1.4740	6.8	discard	426	28.7	7min bs=8 lr=2e-3 decay=3500
+086	1.6145	3.9	discard	306	22.0	8L 192d (tiny+deep)
+087	2.4671	6.8	discard	306	-19.3	lr=8e-3 decay=1500 warm=100
+088	1.5536	6.8	discard	306	24.9	bs=4 lr=2e-3 decay=3000
+089	1.5022	6.8	discard	306	27.4	mlp_ratio=3 bs=8
+090	1.3218	6.8	keep	600	36.1	5x more data (70K) + augmentation + 10min + bs=8 - NEW BEST! TARGET HIT!

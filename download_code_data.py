@@ -37,6 +37,46 @@ def format_example(instruction, code):
     code = code.strip()
     return f"### Question\n{instruction}\n### Python Code\n{code}"
 
+def augment_examples(examples):
+    """Create augmented examples by rephrasing instructions."""
+    rephrase_prefixes = [
+        ("Write a function", "Create a function"),
+        ("Write a function", "Implement a function"),
+        ("Write a function", "Define a function"),
+        ("Write a function", "Code a function"),
+        ("Write a function", "Build a function"),
+        ("Write a program", "Create a program"),
+        ("Write a program", "Implement a program"),
+        ("Write a Python", "Create a Python"),
+        ("Write a Python", "Implement a Python"),
+        ("Write code", "Create code"),
+        ("Write code", "Implement code"),
+    ]
+    augmented = []
+    random.seed(123)  # deterministic augmentation
+    for ex in examples:
+        # Extract instruction from format: "### Question\n{instruction}\n### Python Code\n{code}"
+        parts = ex.split("### Python Code\n", 1)
+        if len(parts) != 2:
+            continue
+        q_part = parts[0]  # "### Question\n{instruction}\n"
+        code = parts[1]
+        instruction = q_part.replace("### Question\n", "").strip()
+
+        # Try each rephrase
+        for old, new in rephrase_prefixes:
+            if instruction.startswith(old):
+                new_instruction = instruction.replace(old, new, 1)
+                augmented.append(format_example(new_instruction, code))
+                break  # one augmentation per example
+        else:
+            # For non-"Write" instructions, add "In Python, " prefix
+            if random.random() < 0.3 and not instruction.startswith("In Python"):
+                augmented.append(format_example(f"In Python, {instruction[0].lower()}{instruction[1:]}", code))
+
+    return augmented
+
+
 def collect_examples():
     """Collect examples from multiple sources."""
     examples = []
@@ -82,11 +122,67 @@ def collect_examples():
     except Exception as e:
         print(f"  Failed to download MBPP: {e}")
 
-    # 3. Generate some synthetic simple examples for more data
+    # 3. Evol-Instruct Code (WizardCoder-style evolved instructions)
+    print("\n--- Evol-Instruct-Code-80k (Python subset) ---")
+    url = "https://huggingface.co/datasets/nickrosh/Evol-Instruct-Code-80k-v1/resolve/main/EvolInstruct-Code-80k.json"
+    try:
+        data = download_json(url)
+        count = 0
+        for item in data:
+            instruction = item.get("instruction", "")
+            output = item.get("output", "")
+            if not output or len(output) < 20:
+                continue
+            # Filter for Python
+            python_markers = ["def ", "import ", "print(", "class ", "return ", " = ", "lambda ", "for ", "while "]
+            # Must look like Python (not Java, C++, etc.)
+            non_python = ["public static", "System.out", "#include", "cout <<", "console.log", "func ", "fn "]
+            if any(m in output for m in python_markers) and not any(m in output for m in non_python):
+                # Skip very long examples (> 1500 chars) to keep seq_len manageable
+                formatted = format_example(instruction, output)
+                if len(formatted) < 2000:
+                    examples.append(formatted)
+                    count += 1
+        print(f"  Collected {count} Python examples from Evol-Instruct-Code")
+    except Exception as e:
+        print(f"  Failed to download Evol-Instruct-Code: {e}")
+
+    # 4. Code Instructions from Alpaca (120k)
+    print("\n--- Code-Instructions-120k (Python subset) ---")
+    url = "https://huggingface.co/datasets/TokenBender/code_instructions_122k_alpaca_style/resolve/main/data.json"
+    try:
+        data = download_json(url)
+        count = 0
+        for item in data:
+            instruction = item.get("instruction", "")
+            output = item.get("output", "")
+            inp = item.get("input", "")
+            if not output or len(output) < 20:
+                continue
+            if inp:
+                instruction = f"{instruction}\nInput: {inp}"
+            python_markers = ["def ", "import ", "print(", "class ", "return ", " = ", "lambda "]
+            non_python = ["public static", "System.out", "#include", "cout <<", "console.log"]
+            if any(m in output for m in python_markers) and not any(m in output for m in non_python):
+                formatted = format_example(instruction, output)
+                if len(formatted) < 2000:
+                    examples.append(formatted)
+                    count += 1
+        print(f"  Collected {count} Python examples from Code-Instructions-120k")
+    except Exception as e:
+        print(f"  Failed to download Code-Instructions-120k: {e}")
+
+    # 5. Generate some synthetic simple examples for more data
     print("\n--- Synthetic examples ---")
     synthetic = generate_synthetic_examples()
     examples.extend(synthetic)
     print(f"  Generated {len(synthetic)} synthetic examples")
+
+    # 6. Data augmentation — rephrase instructions
+    print("\n--- Augmenting via instruction rephrasing ---")
+    augmented = augment_examples(examples)
+    examples.extend(augmented)
+    print(f"  Generated {len(augmented)} augmented examples")
 
     return examples
 
@@ -152,8 +248,13 @@ def generate_synthetic_examples():
     return examples
 
 
-def save_as_shards(examples, num_train_shards=5):
-    """Save examples as parquet shards in the data directory."""
+def save_as_shards(examples, original_examples=None, num_train_shards=5):
+    """Save examples as parquet shards in the data directory.
+
+    If original_examples is provided, the val set is derived from the original
+    examples only (same seed=42 split) to keep val comparable across runs.
+    New examples (in `examples` but not in original) go only to training.
+    """
     os.makedirs(DATA_DIR, exist_ok=True)
 
     # Clear old data and tokenizer
@@ -164,16 +265,32 @@ def save_as_shards(examples, num_train_shards=5):
         for f in os.listdir(TOKENIZER_DIR):
             os.remove(os.path.join(TOKENIZER_DIR, f))
 
+    if original_examples is not None:
+        # Reproduce the original val split exactly
+        orig = list(original_examples)
+        random.seed(42)
+        random.shuffle(orig)
+        val_size = max(len(orig) // 10, 50)
+        val_examples = orig[-val_size:]
+        orig_train = orig[:-val_size]
+
+        # Val set as a set for dedup
+        val_set = set(val_examples)
+        # All examples minus val = training (includes new data)
+        train_examples = [e for e in examples if e not in val_set]
+        print(f"  Val set: {len(val_examples)} (from original split, unchanged)")
+        print(f"  Train set: {len(train_examples)} unique (original + new data)")
+    else:
+        random.seed(42)
+        random.shuffle(examples)
+        val_size = max(len(examples) // 10, 50)
+        train_examples = examples[:-val_size]
+        val_examples = examples[-val_size:]
+
+    # Duplicate training data for more exposure
+    repetitions = 20
+    train_examples = train_examples * repetitions
     random.seed(42)
-    random.shuffle(examples)
-
-    # Split: last portion for validation
-    val_size = max(len(examples) // 10, 50)
-    train_examples = examples[:-val_size]
-    val_examples = examples[-val_size:]
-
-    # Duplicate training data to have more tokens (small dataset, repeat it)
-    train_examples = train_examples * 10  # 10x repetition — more exposure
     random.shuffle(train_examples)
 
     # Save training shards
@@ -187,23 +304,60 @@ def save_as_shards(examples, num_train_shards=5):
         pq.write_table(table, path)
         print(f"  Saved {path} ({len(shard_examples)} examples)")
 
-    # Save validation shard (shard_00005 = VAL_SHARD in modified prepare.py)
+    # Save validation shard
     val_table = pa.table({"text": val_examples})
     val_path = os.path.join(DATA_DIR, f"shard_{num_train_shards:05d}.parquet")
     pq.write_table(val_table, val_path)
     print(f"  Saved {val_path} ({len(val_examples)} validation examples)")
 
     print(f"\nTotal: {len(train_examples)} train, {len(val_examples)} val examples")
-    print(f"Unique train examples: {len(train_examples) // 5}")
+    print(f"Unique train examples: {len(train_examples) // repetitions}")
+
+
+def collect_original_examples():
+    """Collect only the original sources (CodeAlpaca + MBPP + synthetic).
+    This reproduces the exact same dataset used for the original val split.
+    """
+    examples = []
+
+    # 1. CodeAlpaca-20k (same as before)
+    url = "https://huggingface.co/datasets/sahil2801/CodeAlpaca-20k/resolve/main/code_alpaca_20k.json"
+    try:
+        data = download_json(url)
+        for item in data:
+            instruction = item.get("instruction", "")
+            output = item.get("output", "")
+            inp = item.get("input", "")
+            if not output or len(output) < 10:
+                continue
+            if inp:
+                instruction = f"{instruction}\nInput: {inp}"
+            python_markers = ["def ", "import ", "print(", "for ", "while ", "if ", "class ", "return ", " = ", "lambda "]
+            if any(m in output for m in python_markers):
+                examples.append(format_example(instruction, output))
+    except Exception:
+        pass
+
+    # 2. Synthetic
+    examples.extend(generate_synthetic_examples())
+    return examples
 
 
 if __name__ == "__main__":
     print("=== Downloading NLQ -> Python Code Dataset ===\n")
-    examples = collect_examples()
-    print(f"\nTotal collected: {len(examples)} examples")
+
+    # First collect original sources (for stable val split)
+    print("--- Collecting original sources (for val split) ---")
+    original_examples = collect_original_examples()
+    print(f"  Original sources: {len(original_examples)} examples")
+
+    # Then collect everything (original + new)
+    print("\n--- Collecting all sources ---")
+    all_examples = collect_examples()
+    print(f"\nTotal collected: {len(all_examples)} examples")
 
     print("\n=== Saving as parquet shards ===\n")
-    save_as_shards(examples, num_train_shards=5)
+    save_as_shards(all_examples, original_examples=original_examples, num_train_shards=5)
 
     print("\n=== Done! ===")
     print("Next steps:")

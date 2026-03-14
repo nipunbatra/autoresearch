@@ -43,16 +43,16 @@ N_HEAD = N_EMBD // HEAD_DIM  # 5
 N_KV_HEAD = N_HEAD
 MLP_RATIO = 4
 USE_SWIGLU = False
-DROPOUT = 0.3
+DROPOUT = 0.2
 
 # Training
 BATCH_SIZE = 8
 LEARNING_RATE = 3e-3
 WEIGHT_DECAY = 0.5
 WARMUP_STEPS = 300
-TIME_BUDGET = 300
+TIME_BUDGET = 600
 GRAD_CLIP = 1.0
-DECAY_STEPS = 5000
+DECAY_STEPS = 8000
 USE_LION = False
 
 # ---------------------------------------------------------------------------
