@@ -51,23 +51,23 @@ BEST_CONFIG = {
 # Best config: bs=8 + dropout=0.3 + warmup=300 + wd=0.5
 # Plateau at ~29%. Need fundamentally different levers.
 EXPERIMENTS = [
-    # Cosine schedule tuning (bs=8 does ~1900 steps, current decay=5000)
-    ("decay=2000 (match steps)", {"DECAY_STEPS": 2000}),
-    ("decay=3000", {"DECAY_STEPS": 3000}),
-    ("decay=8000 (slower decay)", {"DECAY_STEPS": 8000}),
-    # Higher LR + matched decay (squeeze more from schedule)
-    ("lr=4e-3 decay=2000", {"LEARNING_RATE": 4e-3, "DECAY_STEPS": 2000}),
+    # Remaining from round 5 + new ideas
     ("lr=5e-3 decay=2000", {"LEARNING_RATE": 5e-3, "DECAY_STEPS": 2000}),
-    # 7 min training (more steps, adjusted decay)
     ("7min decay=3500", {"TIME_BUDGET": 420, "DECAY_STEPS": 3500}),
-    # Weight decay + deeper
-    ("wd=0.7 + 6L", {"WEIGHT_DECAY": 0.7, "DEPTH": 6}),
-    # Small model many steps (3.9M params, even faster per step)
+    ("7min bs=8 lr=2e-3 decay=3500", {"TIME_BUDGET": 420, "DECAY_STEPS": 3500, "LEARNING_RATE": 2e-3}),
     ("8L 192d (tiny+deep)", {"DEPTH": 8, "N_EMBD": 192}),
-    # Aggressive regularization combo
-    ("drop=0.3 wd=1.0 decay=3000", {"DROPOUT": 0.3, "WEIGHT_DECAY": 1.0, "DECAY_STEPS": 3000}),
-    # Very high LR with short decay (aggressive start, fast cooldown)
     ("lr=8e-3 decay=1500 warm=100", {"LEARNING_RATE": 8e-3, "DECAY_STEPS": 1500, "WARMUP_STEPS": 100}),
+    # Gradient accumulation via 2 mini-batches (bs=4 x2 = effective bs=8)
+    # Actually just try bs=4 with higher LR to compensate
+    ("bs=4 lr=2e-3 decay=3000", {"BATCH_SIZE": 4, "LEARNING_RATE": 2e-3, "DECAY_STEPS": 3000}),
+    # MLP ratio 3 (fewer params per layer = faster = more steps)
+    ("mlp_ratio=3 bs=8", {"MLP_RATIO": 3}),
+    # Wide + shallow (more capacity per step)
+    ("3L 448d bs=8", {"DEPTH": 3, "N_EMBD": 448}),
+    # 10 min with very slow decay
+    ("10min decay=6000", {"TIME_BUDGET": 600, "DECAY_STEPS": 6000}),
+    # The nuclear option: everything at once
+    ("10min bs=4 lr=2e-3 drop=0.3 wd=0.7", {"TIME_BUDGET": 600, "BATCH_SIZE": 4, "LEARNING_RATE": 2e-3, "WEIGHT_DECAY": 0.7, "DECAY_STEPS": 6000}),
 ]
 
 
