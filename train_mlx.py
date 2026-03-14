@@ -50,9 +50,9 @@ BATCH_SIZE = 8
 LEARNING_RATE = 3e-3
 WEIGHT_DECAY = 0.5
 WARMUP_STEPS = 300
-TIME_BUDGET = 420
+TIME_BUDGET = 300
 GRAD_CLIP = 1.0
-DECAY_STEPS = 3500
+DECAY_STEPS = 5000
 USE_LION = False
 
 # ---------------------------------------------------------------------------
