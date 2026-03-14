@@ -2,15 +2,15 @@
   "config": {
     "vocab_size": 2048,
     "n_layer": 5,
-    "n_head": 6,
-    "n_kv_head": 6,
-    "n_embd": 384,
+    "n_head": 5,
+    "n_kv_head": 5,
+    "n_embd": 320,
     "head_dim": 64,
     "seq_len": 512
   },
-  "val_loss": 1.6259934306144714,
-  "n_params_M": 9.638016,
-  "step": 2464,
-  "total_tokens_M": 20.185088,
-  "training_seconds": 300.10085701942444
+  "val_loss": 1.5992651641368867,
+  "n_params_M": 6.80288,
+  "step": 3041,
+  "total_tokens_M": 24.911872,
+  "training_seconds": 300.0633509159088
 }

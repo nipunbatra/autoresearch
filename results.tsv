@@ -57,3 +57,4 @@ run	val_loss	params_M	status	time_s	improv_%	description
 056	1.6084	8.0	discard	306	22.2	6L 320d bs=16
 057	1.6299	9.3	discard	306	21.2	7L 320d bs=16
 058	1.6260	9.6	discard	306	21.4	5L 384d bs=16
+059	1.5993	6.8	discard	306	22.7	bs=16 grad_clip=0.5
