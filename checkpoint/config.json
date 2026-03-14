@@ -8,9 +8,9 @@
     "head_dim": 64,
     "seq_len": 512
   },
-  "val_loss": 1.686176278591156,
+  "val_loss": 2.0320540380477907,
   "n_params_M": 6.80288,
-  "step": 10769,
-  "total_tokens_M": 22.054912,
-  "training_seconds": 300.0248520374298
+  "step": 17509,
+  "total_tokens_M": 17.929216,
+  "training_seconds": 300.00129985809326
 }
