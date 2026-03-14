@@ -73,3 +73,4 @@ run	val_loss	params_M	status	time_s	improv_%	description
 072	1.5097	6.8	discard	306	27.0	combo + wd=1.0
 073	1.4726	6.8	discard	306	28.8	combo + lr=4e-3
 074	1.5064	6.8	discard	306	27.2	combo + lr=2e-3
+075	1.4811	6.8	discard	306	28.4	combo + lr=5e-3
