@@ -33,7 +33,7 @@ BEST_CONFIG = {
     "MLP_RATIO": 4,
     "USE_SWIGLU": False,
     "DROPOUT": 0.1,
-    "BATCH_SIZE": 16,
+    "BATCH_SIZE": 8,
     "LEARNING_RATE": 3e-3,
     "WEIGHT_DECAY": 0.5,
     "WARMUP_STEPS": 150,
@@ -47,24 +47,24 @@ BEST_CONFIG = {
 # --- Experiments to run ---
 # Each experiment: (description, {overrides})
 # Target: 35% improvement = val_loss < 1.345
+# Current best: bs=8 (1.5004, 27.5%)
 EXPERIMENTS = [
-    # Combine the two best findings
-    ("bs=16 + wd=0.7 (combo)", {"WEIGHT_DECAY": 0.7}),
-    # Even smaller batch = even more steps
-    ("bs=8 (4x more steps)", {"BATCH_SIZE": 8}),
-    # Higher LR might work better with small batch
-    ("bs=16 lr=4e-3", {"LEARNING_RATE": 4e-3}),
-    ("bs=16 lr=5e-3", {"LEARNING_RATE": 5e-3}),
-    # Dropout sweep at new baseline
-    ("bs=16 dropout=0.15", {"DROPOUT": 0.15}),
-    ("bs=16 dropout=0.2", {"DROPOUT": 0.2}),
-    # Deeper model with small batch (more steps for more params)
-    ("6L 320d bs=16", {"DEPTH": 6}),
-    ("7L 320d bs=16", {"DEPTH": 7}),
-    # Wider model
-    ("5L 384d bs=16", {"N_EMBD": 384}),
-    # Gradient clip sweep
-    ("bs=16 grad_clip=0.5", {"GRAD_CLIP": 0.5}),
+    # Push batch size even lower
+    ("bs=4 (8x more steps)", {"BATCH_SIZE": 4}),
+    ("bs=2 (16x more steps)", {"BATCH_SIZE": 2}),
+    # Combine bs=8 with wd=0.7
+    ("bs=8 + wd=0.7", {"WEIGHT_DECAY": 0.7}),
+    ("bs=8 + wd=1.0", {"WEIGHT_DECAY": 1.0}),
+    # Higher LR with small batch (linear scaling rule)
+    ("bs=8 lr=4e-3", {"LEARNING_RATE": 4e-3}),
+    ("bs=8 lr=2e-3", {"LEARNING_RATE": 2e-3}),
+    # Dropout with small batch
+    ("bs=8 dropout=0.15", {"DROPOUT": 0.15}),
+    ("bs=8 dropout=0.2", {"DROPOUT": 0.2}),
+    # More warmup for small batch (more noisy gradients)
+    ("bs=8 warmup=300", {"WARMUP_STEPS": 300}),
+    # Deeper + small batch
+    ("6L bs=8", {"DEPTH": 6}),
 ]
 
 
