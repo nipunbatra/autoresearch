@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autoresearch: NLQ to Python Code</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+            background: #0d1117;
+            color: #c9d1d9;
+            padding: 2rem;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        h1 { color: #58a6ff; margin-bottom: 0.3rem; font-size: 1.6rem; }
+        .subtitle { color: #8b949e; margin-bottom: 2rem; font-size: 0.85rem; }
+        .plot-container {
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        .plot-container img {
+            max-width: 100%;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+        }
+        h2 { color: #58a6ff; margin: 1.5rem 0 0.8rem; font-size: 1.2rem; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+        }
+        th {
+            background: #161b22;
+            color: #58a6ff;
+            padding: 0.5rem 0.8rem;
+            text-align: left;
+            border-bottom: 2px solid #30363d;
+            position: sticky;
+            top: 0;
+        }
+        td {
+            padding: 0.4rem 0.8rem;
+            border-bottom: 1px solid #21262d;
+        }
+        tr:hover { background: #161b22; }
+        .keep { color: #51cf66; font-weight: bold; }
+        .discard { color: #ff6b6b; }
+        .best-row { background: #1a3a1a !important; }
+        .timestamp {
+            color: #484f58;
+            font-size: 0.75rem;
+            margin-top: 2rem;
+            text-align: center;
+        }
+        a { color: #58a6ff; }
+    </style>
+</head>
+<body>
+    <h1>Autoresearch: NLQ to Python Code</h1>
+    <p class="subtitle">
+        Autonomous AI research loop training a tiny GPT model for code generation.
+        <a href="https://github.com/nipunbatra/autoresearch">GitHub</a>
+    </p>
+
+    <div class="plot-container">
+        <img src="experiments_plot.png" alt="Experiment progress plot" id="plot">
+    </div>
+
+    <h2>Experiment Log</h2>
+    <div id="table-container">Loading results...</div>
+
+    <p class="timestamp" id="timestamp"></p>
+
+    <script>
+        fetch('results.tsv')
+            .then(r => r.text())
+            .then(tsv => {
+                const lines = tsv.trim().split('\n');
+                const headers = lines[0].split('\t');
+                const rows = lines.slice(1).map(l => l.split('\t'));
+
+                // Find best val_loss
+                let bestLoss = Infinity;
+                let bestIdx = -1;
+                rows.forEach((r, i) => {
+                    const loss = parseFloat(r[1]);
+                    if (loss < bestLoss) { bestLoss = loss; bestIdx = i; }
+                });
+
+                let html = '<table><thead><tr>';
+                headers.forEach(h => html += `<th>${h}</th>`);
+                html += '</tr></thead><tbody>';
+
+                rows.forEach((row, i) => {
+                    const status = row[3];
+                    const isBest = i === bestIdx;
+                    html += `<tr class="${isBest ? 'best-row' : ''}">`;
+                    row.forEach((cell, j) => {
+                        if (j === 3) {
+                            html += `<td class="${status}">${cell}</td>`;
+                        } else {
+                            html += `<td>${cell}</td>`;
+                        }
+                    });
+                    html += '</tr>';
+                });
+
+                html += '</tbody></table>';
+                document.getElementById('table-container').innerHTML = html;
+                document.getElementById('timestamp').textContent =
+                    `${rows.length} experiments | Best: ${bestLoss.toFixed(4)} | Auto-updated on push`;
+            })
+            .catch(() => {
+                document.getElementById('table-container').textContent = 'Failed to load results.';
+            });
+
+        // Cache-bust the plot
+        document.getElementById('plot').src = 'experiments_plot.png?' + Date.now();
+    </script>
+</body>
+</html>

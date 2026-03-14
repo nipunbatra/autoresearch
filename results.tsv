@@ -1,0 +1,38 @@
+run	val_loss	params_M	status	description
+001	2.0686	7.5	keep	baseline: depth=5 dim=320 bs=16 lr=3e-4
+002	2.0883	7.5	discard	bs=32 lr=6e-4 (overfit: train=0.57 val=2.09)
+003	2.0178	7.5	keep	bs=32 lr=3e-4 wd=0.3 + fixed generation + safetensors save
+004	2.0197	5.8	discard	deeper (6L) narrower (256d) - same val_loss but fewer params
+005	2.1684	15.0	discard	8L 384d 10min - bigger model overfit harder on small dataset
+006	2.1626	4.8	discard	3L 256d 8x-MLP GQA(4q/2kv) - creative generation but high val_loss
+007	2.0588	9.5	discard	SwiGLU activation (LLaMA-style) - extra gate params hurt with small data
+008	2.0072	7.5	keep	dropout=0.1 on embeddings + residuals
+009	2.8445	7.5	discard	label smoothing 0.1 - destroyed performance
+010	2.0086	6.8	keep	tied embeddings (wte=lm_head) - similar loss fewer params
+011	1.9627	6.8	keep	lr=4e-4 warmup=150 + tied emb + dropout
+012	1.9501	6.8	keep	lr=5e-4
+013	1.9306	6.8	keep	lr=7e-4
+014	1.8981	6.8	keep	lr=1e-3
+015	1.8439	6.8	keep	lr=1.5e-3
+016	1.7894	6.8	keep	lr=2e-3
+017	1.7111	6.8	keep	lr=3e-3
+018	1.8252	6.8	discard	lr=5e-3 - too high
+019	1.7439	6.8	discard	lr=3.5e-3
+020	1.7241	6.8	discard	dropout=0.15
+021	1.7368	6.8	discard	dropout=0.05
+022	1.7763	6.8	discard	batch_size=64 - fewer steps hurts
+023	1.7158	3.9	keep	8L 192d (deep+narrow) - matches 6.8M with half params!
+024	1.7167	5.2	keep	6L 256d
+025	1.9047	8.9	discard	MLP ratio 6x - slower fewer steps
+026	1.7730	6.8	discard	seq_len=256 - shorter context hurts
+027	2.3507	6.8	discard	Lion optimizer - much worse
+028	1.9326	3.9	discard	8L 192d 10min - overfits with longer training
+029	1.7589	6.8	discard	cosine decay=1600 steps - too tight
+030	1.7209	6.8	discard	cosine decay=10000 - too slow
+031	1.7419	6.8	discard	2x data repetition - not enough exposure
+032	1.7061	6.8	keep	10x data repetition - NEW BEST!
+033	1.9241	6.8	discard	8min training - overfits even with 10x data
+034	1.7164	3.9	discard	8L 192d + 10x data - close but 3.9M can't quite beat 6.8M
+035	1.7333	6.8	discard	GELU activation - ReLU squared is better
+036	2.1468	6.8	discard	weight_decay=0.1 - too little regularization
+037	1.6548	6.8	keep	weight_decay=0.5 + 10x data - NEW BEST!

@@ -429,26 +429,26 @@ class MuonAdamW(torch.optim.Optimizer):
 # Hyperparameters (edit these directly, no CLI flags needed)
 # ---------------------------------------------------------------------------
 
-# Model architecture
+# Model architecture (~10M params for NLQ -> Python code)
 ASPECT_RATIO = 64       # model_dim = depth * ASPECT_RATIO
-HEAD_DIM = 128          # target head dimension for attention
-WINDOW_PATTERN = "SSSL" # sliding window pattern: L=full, S=half context
+HEAD_DIM = 64           # target head dimension for attention (smaller for small model)
+WINDOW_PATTERN = "SL"   # sliding window pattern: L=full, S=half context
 
 # Optimization
-TOTAL_BATCH_SIZE = 2**19 # ~524K tokens per optimizer step
+TOTAL_BATCH_SIZE = 2**16 # ~65K tokens per optimizer step (smaller for small dataset)
 EMBEDDING_LR = 0.6      # learning rate for token embeddings (Adam)
 UNEMBEDDING_LR = 0.004  # learning rate for lm_head (Adam)
 MATRIX_LR = 0.04        # learning rate for matrix parameters (Muon)
 SCALAR_LR = 0.5         # learning rate for per-layer scalars (Adam)
 WEIGHT_DECAY = 0.2      # cautious weight decay for Muon
 ADAM_BETAS = (0.8, 0.95) # Adam beta1, beta2
-WARMUP_RATIO = 0.0      # fraction of time budget for LR warmup
-WARMDOWN_RATIO = 0.5    # fraction of time budget for LR warmdown
+WARMUP_RATIO = 0.1      # fraction of time budget for LR warmup (warmup helps on small data)
+WARMDOWN_RATIO = 0.4    # fraction of time budget for LR warmdown
 FINAL_LR_FRAC = 0.0     # final LR as fraction of initial
 
 # Model size
-DEPTH = 8               # number of transformer layers
-DEVICE_BATCH_SIZE = 128  # per-device batch size (reduce if OOM)
+DEPTH = 5               # number of transformer layers (~10M params with ASPECT_RATIO=64, HEAD_DIM=64)
+DEVICE_BATCH_SIZE = 64   # per-device batch size
 
 # ---------------------------------------------------------------------------
 # Setup: tokenizer, model, optimizer, dataloader
@@ -493,8 +493,10 @@ num_flops_per_token = model.estimate_flops()
 print(f"Estimated FLOPs per token: {num_flops_per_token:e}")
 
 tokens_per_fwdbwd = DEVICE_BATCH_SIZE * MAX_SEQ_LEN
-assert TOTAL_BATCH_SIZE % tokens_per_fwdbwd == 0
-grad_accum_steps = TOTAL_BATCH_SIZE // tokens_per_fwdbwd
+if TOTAL_BATCH_SIZE % tokens_per_fwdbwd != 0:
+    TOTAL_BATCH_SIZE = max(tokens_per_fwdbwd, (TOTAL_BATCH_SIZE // tokens_per_fwdbwd) * tokens_per_fwdbwd)
+    print(f"Adjusted TOTAL_BATCH_SIZE to {TOTAL_BATCH_SIZE}")
+grad_accum_steps = max(1, TOTAL_BATCH_SIZE // tokens_per_fwdbwd)
 
 optimizer = model.setup_optimizer(
     unembedding_lr=UNEMBEDDING_LR,
@@ -628,3 +630,38 @@ print(f"total_tokens_M:   {total_tokens / 1e6:.1f}")
 print(f"num_steps:        {step}")
 print(f"num_params_M:     {num_params / 1e6:.1f}")
 print(f"depth:            {DEPTH}")
+
+# Save model checkpoint for inference
+SAVE_DIR = os.path.join(os.path.dirname(__file__), "checkpoint")
+os.makedirs(SAVE_DIR, exist_ok=True)
+# Save the raw model state dict (unwrap torch.compile)
+raw_model = model._orig_mod if hasattr(model, '_orig_mod') else model
+checkpoint = {
+    "model_state_dict": raw_model.state_dict(),
+    "config": asdict(config),
+    "val_bpb": val_bpb,
+    "num_params": num_params,
+    "step": step,
+}
+ckpt_path = os.path.join(SAVE_DIR, "model.pt")
+torch.save(checkpoint, ckpt_path)
+print(f"Saved checkpoint to {ckpt_path}")
+
+# Also save training log
+log_path = os.path.join(SAVE_DIR, "training_log.json")
+import json
+log = {
+    "val_bpb": val_bpb,
+    "training_seconds": total_training_time,
+    "total_seconds": t_end - t_start,
+    "peak_vram_mb": peak_vram_mb,
+    "mfu_percent": steady_state_mfu,
+    "total_tokens_M": total_tokens / 1e6,
+    "num_steps": step,
+    "num_params_M": num_params / 1e6,
+    "depth": DEPTH,
+    "config": asdict(config),
+}
+with open(log_path, "w") as f:
+    json.dump(log, f, indent=2)
+print(f"Saved training log to {log_path}")

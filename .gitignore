@@ -19,5 +19,5 @@ AGENTS.md
 # Experimental code/artifacts
 dev/
 
-# Results file
-results.tsv
+# Large model checkpoint (27MB)
+checkpoint/model.safetensors
