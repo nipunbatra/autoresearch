@@ -52,3 +52,4 @@ run	val_loss	params_M	status	time_s	improv_%	description
 051	1.5004	6.8	keep	306	27.5	bs=8 (4x more steps) NEW BEST!
 052	1.6129	6.8	discard	306	22.0	bs=16 lr=4e-3
 053	1.6551	6.8	discard	306	20.0	bs=16 lr=5e-3
+054	1.5793	6.8	discard	306	23.7	bs=16 dropout=0.15
