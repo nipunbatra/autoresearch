@@ -138,7 +138,7 @@ def append_result(run_num, val_loss, params_M, status, description):
 
 def generate_plot():
     """Regenerate experiments_plot.png from results.tsv."""
-    runs, losses, statuses, descs = [], [], [], []
+    runs, losses, statuses, descs, params = [], [], [], [], []
     with open(RESULTS_TSV) as f:
         reader = csv.DictReader(f, delimiter="\t")
         for row in reader:
@@ -146,46 +146,122 @@ def generate_plot():
             losses.append(float(row["val_loss"]))
             statuses.append(row["status"])
             descs.append(row["description"])
+            params.append(float(row["params_M"]))
 
-    fig, ax = plt.subplots(figsize=(16, 7))
+    fig, (ax_main, ax_zoom) = plt.subplots(1, 2, figsize=(20, 8),
+                                            gridspec_kw={"width_ratios": [3, 2]})
+    fig.patch.set_facecolor("#0d1117")
 
-    # Color by status
+    for ax in (ax_main, ax_zoom):
+        ax.set_facecolor("#161b22")
+        ax.tick_params(colors="#8b949e")
+        ax.spines["bottom"].set_color("#30363d")
+        ax.spines["left"].set_color("#30363d")
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.grid(True, alpha=0.15, color="#8b949e")
+
+    # --- LEFT: Full view ---
     keep_x = [r for r, s in zip(runs, statuses) if s == "keep"]
     keep_y = [l for l, s in zip(losses, statuses) if s == "keep"]
     disc_x = [r for r, s in zip(runs, statuses) if s == "discard"]
     disc_y = [l for l, s in zip(losses, statuses) if s == "discard"]
 
-    ax.scatter(disc_x, disc_y, c="#ff6b6b", s=60, zorder=3, label="discard", alpha=0.7)
-    ax.scatter(keep_x, keep_y, c="#51cf66", s=80, zorder=4, label="keep", edgecolors="white", linewidth=0.5)
+    ax_main.plot(runs, losses, c="#30363d", alpha=0.5, linewidth=1, zorder=1)
+    ax_main.scatter(disc_x, disc_y, c="#f85149", s=50, zorder=3, label="discard", alpha=0.6, marker="x", linewidths=2)
+    ax_main.scatter(keep_x, keep_y, c="#3fb950", s=90, zorder=4, label="keep", edgecolors="white", linewidth=1)
 
-    # Connect all points with a thin line
-    ax.plot(runs, losses, c="#495057", alpha=0.3, linewidth=1, zorder=1)
-
-    # Best envelope line
+    # Best envelope
     best_so_far = []
     current_best = float("inf")
     for l in losses:
         current_best = min(current_best, l)
         best_so_far.append(current_best)
-    ax.plot(runs, best_so_far, c="#51cf66", linewidth=2, alpha=0.6, linestyle="--", label="best so far", zorder=2)
+    ax_main.plot(runs, best_so_far, c="#3fb950", linewidth=2.5, alpha=0.8, linestyle="--", label="best so far", zorder=2)
 
-    # Annotate key experiments (every kept one)
-    for i, (r, l, s, d) in enumerate(zip(runs, losses, statuses, descs)):
-        if s == "keep":
-            # Shorten description
-            short = d[:40] + "..." if len(d) > 40 else d
-            ax.annotate(short, (r, l), fontsize=5.5, rotation=30,
-                       textcoords="offset points", xytext=(5, 8),
-                       color="#51cf66", alpha=0.8)
+    # Annotate only milestones (kept experiments that improved best)
+    prev_best = float("inf")
+    for r, l, s, d in zip(runs, losses, statuses, descs):
+        if s == "keep" and l < prev_best:
+            short = d.split(" - ")[0] if " - " in d else d
+            short = short[:35]
+            ax_main.annotate(
+                f"#{r}: {short}\n({l:.4f})",
+                (r, l), fontsize=7, fontweight="bold",
+                textcoords="offset points", xytext=(8, 12),
+                color="#3fb950",
+                arrowprops=dict(arrowstyle="-", color="#3fb950", alpha=0.4, lw=0.8),
+                bbox=dict(boxstyle="round,pad=0.2", fc="#0d1117", ec="#3fb950", alpha=0.7, lw=0.5),
+            )
+            prev_best = l
 
-    ax.set_xlabel("Experiment #", fontsize=12)
-    ax.set_ylabel("Validation Loss", fontsize=12)
-    ax.set_title("Autoresearch: NLQ→Python Code Model Experiments", fontsize=14, fontweight="bold")
-    ax.legend(loc="upper right")
-    ax.grid(True, alpha=0.2)
-    ax.set_facecolor("#f8f9fa")
-    fig.tight_layout()
-    fig.savefig(PLOT_PATH, dpi=150, bbox_inches="tight")
+    ax_main.set_xlabel("Experiment #", fontsize=12, color="#c9d1d9")
+    ax_main.set_ylabel("Validation Loss", fontsize=12, color="#c9d1d9")
+    ax_main.set_title("All Experiments", fontsize=14, fontweight="bold", color="#c9d1d9")
+    ax_main.legend(loc="upper right", facecolor="#161b22", edgecolor="#30363d",
+                   labelcolor="#c9d1d9", fontsize=9)
+
+    # --- RIGHT: Zoomed view (only the competitive region) ---
+    # Filter to experiments with loss < 2.0
+    zoom_threshold = 1.85
+    z_runs = [r for r, l in zip(runs, losses) if l <= zoom_threshold]
+    z_losses = [l for r, l in zip(runs, losses) if l <= zoom_threshold]
+    z_statuses = [s for l, s in zip(losses, statuses) if l <= zoom_threshold]
+    z_descs = [d for l, d in zip(losses, descs) if l <= zoom_threshold]
+
+    zk_x = [r for r, s in zip(z_runs, z_statuses) if s == "keep"]
+    zk_y = [l for l, s in zip(z_losses, z_statuses) if s == "keep"]
+    zd_x = [r for r, s in zip(z_runs, z_statuses) if s == "discard"]
+    zd_y = [l for l, s in zip(z_losses, z_statuses) if s == "discard"]
+
+    ax_zoom.scatter(zd_x, zd_y, c="#f85149", s=60, zorder=3, alpha=0.6, marker="x", linewidths=2)
+    ax_zoom.scatter(zk_x, zk_y, c="#3fb950", s=100, zorder=4, edgecolors="white", linewidth=1)
+
+    # Annotate all in zoomed view
+    for r, l, s, d in zip(z_runs, z_losses, z_statuses, z_descs):
+        short = d.split(" - ")[0] if " - " in d else d
+        short = short[:30]
+        color = "#3fb950" if s == "keep" else "#f85149"
+        ax_zoom.annotate(
+            f"{short}",
+            (r, l), fontsize=6.5,
+            textcoords="offset points", xytext=(6, 6),
+            color=color, alpha=0.9, rotation=20,
+        )
+
+    # Best line in zoom
+    z_best = []
+    cb = float("inf")
+    for r, l in zip(runs, losses):
+        cb = min(cb, l)
+        if l <= zoom_threshold:
+            z_best.append((r, cb))
+    if z_best:
+        ax_zoom.plot([x[0] for x in z_best], [x[1] for x in z_best],
+                     c="#3fb950", linewidth=2, alpha=0.6, linestyle="--")
+
+    ax_zoom.set_xlabel("Experiment #", fontsize=12, color="#c9d1d9")
+    ax_zoom.set_ylabel("Validation Loss", fontsize=12, color="#c9d1d9")
+    ax_zoom.set_title(f"Zoomed: Loss < {zoom_threshold}", fontsize=14, fontweight="bold", color="#c9d1d9")
+
+    # Summary stats text box
+    best_loss = min(losses)
+    best_idx = losses.index(best_loss)
+    best_desc = descs[best_idx]
+    summary = (
+        f"Total experiments: {len(runs)}\n"
+        f"Best val_loss: {best_loss:.4f} (#{runs[best_idx]})\n"
+        f"Best config: {best_desc[:50]}\n"
+        f"Improvement: {((losses[0] - best_loss) / losses[0] * 100):.1f}% from baseline"
+    )
+    fig.text(0.5, 0.01, summary, ha="center", fontsize=10, color="#8b949e",
+             family="monospace",
+             bbox=dict(boxstyle="round,pad=0.5", fc="#161b22", ec="#30363d", alpha=0.9))
+
+    fig.suptitle("Autoresearch: NLQ → Python Code Model", fontsize=16,
+                 fontweight="bold", color="#58a6ff", y=0.98)
+    fig.tight_layout(rect=[0, 0.06, 1, 0.95])
+    fig.savefig(PLOT_PATH, dpi=150, bbox_inches="tight", facecolor=fig.get_facecolor())
     plt.close(fig)
     print(f"  Plot saved to {PLOT_PATH}")
 
