@@ -96,3 +96,4 @@ run	val_loss	params_M	status	time_s	improv_%	description
 095	1.3867	6.8	discard	628	33.0	12xdata dropout=0.1
 096	1.4107	6.8	discard	629	31.8	12xdata dropout=0.0
 097	1.3329	6.8	discard	630	35.6	12xdata wd=0.3
+098	1.5036	6.8	discard	629	27.3	12xdata lr=5e-3
