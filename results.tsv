@@ -125,3 +125,4 @@ run	val_loss	params_M	status	time_s	improv_%	description
 124	1.2211	8.0	discard	641	41.0	R10 wd=0.2
 125	1.2032	8.0	discard	641	41.8	R10 wd=0.25
 126	1.3179	8.0	discard	642	36.3	R10 decay=5000
+127	1.2476	8.0	discard	641	39.7	R10 decay=12000
