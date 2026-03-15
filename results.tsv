@@ -138,3 +138,4 @@ run	val_loss	params_M	status	time_s	improv_%	description
 137	1.1813	11.4	discard	641	42.9	R12 lr=1.5e-3
 138	1.1787	11.4	discard	641	43.0	R12 lr=2.5e-3
 139	1.1828	11.4	discard	641	42.8	R12 lr=1e-3
+140	1.2026	11.4	discard	641	41.9	R12 dropout=0.15
