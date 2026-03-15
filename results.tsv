@@ -92,3 +92,4 @@ run	val_loss	params_M	status	time_s	improv_%	description
 091	1.3945	6.8	discard	629	32.6	12xdata baseline
 092	1.3886	8.0	discard	629	32.9	12xdata 6L 320d
 093	1.3648	9.3	discard	628	34.0	12xdata 7L 320d
+094	1.3807	9.6	discard	628	33.3	12xdata 5L 384d
