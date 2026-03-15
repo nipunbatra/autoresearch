@@ -116,3 +116,4 @@ run	val_loss	params_M	status	time_s	improv_%	description
 115	1.2496	8.0	discard	641	39.6	R9 dropout=0.15
 116	1.3562	8.0	discard	641	34.4	R9 warmup=150
 117	1.2350	8.0	discard	641	40.3	R9 warmup=500
+118	1.2606	9.6	discard	641	39.1	R9 384d
