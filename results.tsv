@@ -109,3 +109,4 @@ run	val_loss	params_M	status	time_s	improv_%	description
 108	1.2720	8.0	keep	641	38.5	NLQ-4x 6L drop=0.1 wd=0.3 NEW BEST!
 109	1.2330	8.0	keep	641	40.4	R9 lr=2e-3 NEW BEST!
 110	1.3066	8.0	discard	641	36.8	R9 lr=4e-3
+111	1.3601	8.0	discard	641	34.3	R9 lr=5e-3
