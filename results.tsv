@@ -90,3 +90,4 @@ run	val_loss	params_M	status	time_s	improv_%	description
 089	1.5022	6.8	discard	306	27.4	mlp_ratio=3 bs=8
 090	1.3218	6.8	keep	600	36.1	5x more data (70K) + augmentation + 10min + bs=8 - NEW BEST! TARGET HIT!
 091	1.3945	6.8	discard	629	32.6	12xdata baseline
+092	1.3886	8.0	discard	629	32.9	12xdata 6L 320d
