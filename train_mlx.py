@@ -36,7 +36,7 @@ TOKENIZER_DIR = os.path.join(CACHE_DIR, "tokenizer")
 # Model
 VOCAB_SIZE = 2048
 MAX_SEQ_LEN = 512
-DEPTH = 6
+DEPTH = 7
 N_EMBD = 320
 HEAD_DIM = 64
 N_HEAD = N_EMBD // HEAD_DIM  # 5
