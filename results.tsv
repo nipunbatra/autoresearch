@@ -111,3 +111,4 @@ run	val_loss	params_M	status	time_s	improv_%	description
 110	1.3066	8.0	discard	641	36.8	R9 lr=4e-3
 111	1.3601	8.0	discard	641	34.3	R9 lr=5e-3
 112	1.2531	8.0	discard	641	39.4	R9 wd=0.2
+113	1.2951	8.0	discard	641	37.4	R9 wd=0.4
