@@ -133,3 +133,4 @@ run	val_loss	params_M	status	time_s	improv_%	description
 132	1.1879	9.3	keep	641	42.6	R11 7L NEW BEST!
 133	1.1702	11.4	keep	641	43.4	R11 6L 384d NEW BEST!
 134	1.2000	8.0	discard	641	42.0	R11 warmup=400
+135	1.1859	8.0	discard	641	42.7	R11 warmup=700
