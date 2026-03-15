@@ -97,3 +97,4 @@ run	val_loss	params_M	status	time_s	improv_%	description
 096	1.4107	6.8	discard	629	31.8	12xdata dropout=0.0
 097	1.3329	6.8	discard	630	35.6	12xdata wd=0.3
 098	1.5036	6.8	discard	629	27.3	12xdata lr=5e-3
+099	1.3074	6.8	keep	643	36.8	NLQ-4x baseline NEW BEST!
