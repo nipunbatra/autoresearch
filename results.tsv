@@ -131,3 +131,4 @@ run	val_loss	params_M	status	time_s	improv_%	description
 130	1.2058	8.0	discard	641	41.7	R11 lr=1.5e-3
 131	1.2025	8.0	discard	641	41.9	R11 lr=1.8e-3
 132	1.1879	9.3	keep	641	42.6	R11 7L NEW BEST!
+133	1.1702	11.4	keep	641	43.4	R11 6L 384d NEW BEST!
